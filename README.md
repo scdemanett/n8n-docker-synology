@@ -1,212 +1,263 @@
 # n8n Docker Setup for Synology NAS
 
-A Docker Compose configuration for running [n8n](https://n8n.io) workflow automation tool on Synology NAS with PostgreSQL database.
+A Docker Compose setup for running n8n with PostgreSQL on Synology NAS, optimized for security and ease of deployment via Portainer.
 
 ## 🚀 Features
 
-- n8n setup with PostgreSQL database
-- **Optimized for Synology NAS** with proper permissions and paths
-- **Health checks** for both database and n8n services
-- **Resource limits** to prevent system overload
-- **Persistent storage** for workflows and data
+- **Environment variable configuration** for security and portability
+- **Synology NAS optimized** with proper volume mapping
+- **Portainer compatible** with easy UI deployment
+- **PostgreSQL 17** database with health checks
+- **HTTPS ready** with proper SSL cookie configuration
+- **Automatic restarts** and health monitoring
 
 ## 📋 Prerequisites
 
-- Synology NAS with Docker/Container Manager installed
-- Domain name with HTTPS configured (e.g., via Synology DDNS)
-- Basic knowledge of Docker and command line
-- Sufficient storage space on Volume 1
+- Synology NAS with Docker installed
+- SSH access to your Synology NAS
+- Domain name configured (for HTTPS setup)
+- OpenSSL for key generation
 
-## 🛠️ Quick Start
+## ⚡ Quick Start
 
-### 1. Clone the Repository
+### Option 1: Docker Compose (Command Line)
 
-```bash
-git clone <your-repo-url>
-cd n8n-docker-synology
-```
-
-### 2. Configure Environment
-
-Before starting, you **MUST** update the following values in `docker-compose.yml`:
-
-#### Required Changes:
-
-1. **Domain Configuration**
-   ```yaml
-   N8N_HOST: n8n.yourname.synology.me  # Replace with your domain
-   WEBHOOK_URL: https://n8n.yourname.synology.me  # Replace with your domain
+1. **Clone this repository** or download the files:
+   ```bash
+   git clone <repository-url>
+   cd n8n-docker-synology
    ```
 
-2. **Database Password**
-   ```yaml
-   # In db service:
-   POSTGRES_PASSWORD: n8npass  # Change to a strong password
-   
-   # In n8n service:
-   DB_POSTGRESDB_PASSWORD: n8npass  # Must match the password above
+2. **Create environment file**:
+   ```bash
+   cp env.example .env
    ```
 
-3. **Encryption Key**
-   Generate a new encryption key:
+3. **Generate encryption key**:
    ```bash
    openssl rand -hex 32
    ```
-   Then replace:
-   ```yaml
-   N8N_ENCRYPTION_KEY: <your-generated-key>
+
+4. **Edit `.env` file** with your values:
+   - Update `POSTGRES_PASSWORD` with a strong password
+   - Set `N8N_ENCRYPTION_KEY` to the generated key
+   - Configure `N8N_HOST` and `WEBHOOK_URL` with your domain
+   - Adjust other settings as needed
+
+5. **Create data directories** (SSH into Synology):
+   ```bash
+   mkdir -p /volume1/docker/n8n/db
+   mkdir -p /volume1/docker/n8n/data
+   mkdir -p /volume1/docker/n8n/files
    ```
 
-4. **Timezone** (optional)
-   ```yaml
-   GENERIC_TIMEZONE: America/New_York  # Change to your timezone
-   TZ: America/New_York  # Change to your timezone
+6. **Deploy**:
+   ```bash
+   docker-compose up -d
    ```
 
-### 3. Create Required Directories
+### Option 2: Portainer (Recommended)
 
-SSH into your Synology NAS and create the necessary directories:
+1. **Generate encryption key**:
+   ```bash
+   openssl rand -hex 32
+   ```
 
-```bash
-sudo mkdir -p /volume1/docker/n8n/db
-sudo mkdir -p /volume1/docker/n8n/data
-sudo mkdir -p /volume1/docker/n8n/files
-```
+2. **Create data directories** (SSH into Synology):
+   ```bash
+   mkdir -p /volume1/docker/n8n/db
+   mkdir -p /volume1/docker/n8n/data
+   mkdir -p /volume1/docker/n8n/files
+   ```
 
-### 4. Deploy
+3. **Deploy in Portainer**:
+   - Go to **Stacks** → **Add stack**
+   - Name your stack (e.g., `n8n`)
+   - Copy and paste the `docker-compose.yml` contents
+   - Add environment variables (see section below)
+   - Click **Deploy the stack**
 
-```bash
-docker-compose up -d
-```
+## 🔧 Environment Variables
 
-## 🔧 Configuration Details
+All configuration is done via environment variables. See `env.example` for a complete template.
 
-### Directory Structure
+### Required Variables
+
+| Variable             | Description        | Example                              |
+|----------------------|--------------------|--------------------------------------|
+| `POSTGRES_PASSWORD`  | Database password  | `your_secure_password_here`          |
+| `N8N_ENCRYPTION_KEY` | n8n encryption key | Generate with `openssl rand -hex 32` |
+| `N8N_HOST`           | Your domain name   | `n8n.yourname.synology.me`           |
+| `WEBHOOK_URL`        | Full webhook URL   | `https://n8n.yourname.synology.me`   |
+
+### Optional Variables (with defaults)
+
+| Variable            | Default               | Description                         |
+|---------------------|-----------------------|-------------------------------------|
+| `POSTGRES_DB`       | `n8n`                 | Database name                       |
+| `POSTGRES_USER`     | `n8ndbuser`           | Database username                   |
+| `N8N_PROTOCOL`      | `https`               | Protocol (http/https)               |
+| `N8N_PORT`          | `5678`                | External port                       |
+| `N8N_SECURE_COOKIE` | `true`                | Secure cookies (set false for HTTP) |
+| `TIMEZONE`          | `America/New_York`    | System timezone                     |
+| `DATA_PATH`         | `/volume1/docker/n8n` | Data storage path                   |
+
+### Portainer Environment Variables Setup
+
+In Portainer's Stack interface, add these in the "Environment variables" section:
+
+| Name                 | Value                              | Notes                          |
+|----------------------|------------------------------------|--------------------------------|
+| `POSTGRES_DB`        | `n8n`                              | Database name                  |
+| `POSTGRES_USER`      | `n8ndbuser`                        | Database user                  |
+| `POSTGRES_PASSWORD`  | `your_secure_password`             | **Must be strong!**            |
+| `N8N_HOST`           | `n8n.yourname.synology.me`         | Your domain                    |
+| `WEBHOOK_URL`        | `https://n8n.yourname.synology.me` | Full URL                       |
+| `N8N_ENCRYPTION_KEY` | `generated_key_from_openssl`       | **Required!**                  |
+| `N8N_PROTOCOL`       | `https`                            | Or `http` for testing          |
+| `N8N_PORT`           | `5678`                             | External port                  |
+| `N8N_SECURE_COOKIE`  | `true`                             | Set `false` if not using HTTPS |
+| `TIMEZONE`           | `America/New_York`                 | Your timezone                  |
+| `DATA_PATH`          | `/volume1/docker/n8n`              | Synology path                  |
+
+## 📁 Directory Structure
 
 ```
 /volume1/docker/n8n/
-├── db/          # PostgreSQL database files
-├── data/        # n8n configuration and workflows
-└── files/       # File storage for n8n
+├── db/          # PostgreSQL data
+├── data/        # n8n workflows and settings
+└── files/       # n8n file storage
 ```
 
-### Port Configuration
+## 🛠 Deployment Steps
 
-- **n8n Web UI**: Port 5678
-- Access via: `https://your-domain:5678` or through reverse proxy
+### Docker Compose Deployment
 
-### Environment Variables
+1. Ensure all prerequisites are met
+2. Configure your `.env` file
+3. Create required directories
+4. Run: `docker-compose up -d`
+5. Check logs: `docker-compose logs -f`
 
-| Variable             | Description                    | Default  |
-|----------------------|--------------------------------|----------|
-| `N8N_HOST`           | Your domain name               | Required |
-| `WEBHOOK_URL`        | Full URL for webhooks          | Required |
-| `N8N_ENCRYPTION_KEY` | Encryption key for credentials | Required |
-| `POSTGRES_PASSWORD`  | Database password              | Required |
-| `N8N_PORT`           | n8n listening port             | 5678     |
-| `N8N_PROTOCOL`       | Protocol (http/https)          | https    |
-| `N8N_SECURE_COOKIE`  | Enable secure cookies          | true     |
+### Portainer Deployment
 
-## 🔒 Security Considerations
+1. **Pre-deployment checklist**:
+   - ✅ Generated encryption key
+   - ✅ Created data directories
+   - ✅ Configured domain/DNS
+   - ✅ Port 5678 available
 
-1. **Always generate a new encryption key** - Never use the default one
-2. **Use strong passwords** for the PostgreSQL database
-3. **Enable HTTPS** with a valid SSL certificate
-4. **Regular backups** of your data directory
-5. **Keep containers updated** with the latest security patches
+2. **In Portainer**:
+   - Navigate to **Stacks** → **Add stack**
+   - Name your stack (e.g., `n8n`)
+   - Paste `docker-compose.yml` contents
+   - Add all environment variables from table above
+   - Click **Deploy the stack**
 
-## 🚦 Health Checks
+3. **Monitor deployment**:
+   - Check container health status
+   - View logs if any issues occur
+   - Wait for both containers to be healthy
 
-Both services include health checks:
-- **PostgreSQL**: Checks database availability every 10 seconds
-- **n8n**: Verifies the service is responding on port 5678
+## 🎯 Post-Deployment
 
-## 📊 Resource Management
+1. **Access n8n**:
+   - HTTP: `http://your-synology-ip:5678`
+   - HTTPS: `https://your-domain.synology.me`
 
-Default resource limits:
-- **PostgreSQL**: 512MB memory limit, 256MB reservation
-- **n8n**: 2GB memory limit, 512MB reservation
+2. **Complete setup wizard**:
+   - Create admin account
+   - Configure additional settings
+   - Test webhook functionality
 
-Adjust these based on your workload and available resources.
+3. **Verify functionality**:
+   - Database connection working
+   - Workflows can be created
+   - File storage accessible
 
-## 🔧 Maintenance
+## 🔒 Security Notes
 
-### Backup
-
-Regular backups are crucial. Back up these directories:
-```bash
-/volume1/docker/n8n/data/  # Workflows and credentials
-/volume1/docker/n8n/db/    # Database
-```
-
-### Updates
-
-To update n8n to the latest version:
-```bash
-docker-compose pull
-docker-compose up -d
-```
-
-### Logs
-
-View logs:
-```bash
-# All services
-docker-compose logs -f
-
-# Only n8n
-docker-compose logs -f n8n
-
-# Only database
-docker-compose logs -f db
-```
+- **Never commit `.env`** to version control (already in `.gitignore`)
+- **Use strong passwords** (minimum 16 characters with mixed case, numbers, symbols)
+- **Generate unique encryption key** for each installation
+- **Keep environment variables secure**:
+  ```bash
+  chmod 600 .env  # If using Docker Compose
+  ```
+- **Use HTTPS in production** with valid SSL certificates
+- **Regular backups** of `/volume1/docker/n8n/` directory
+- **Keep containers updated** regularly
 
 ## 🚨 Troubleshooting
 
-### Permission Issues
+### Common Issues
 
-If you encounter permission errors, ensure the n8n service runs as root (user: 0:0) which is configured by default.
+| Issue                          | Solution                                          |
+|--------------------------------|---------------------------------------------------|
+| **Database connection failed** | Ensure `POSTGRES_PASSWORD` matches in all places  |
+| **Cookie/session errors**      | Set `N8N_SECURE_COOKIE=false` if not using HTTPS  |
+| **Permission denied**          | Check directory permissions and ownership         |
+| **Port already in use**        | Change `N8N_PORT` to an available port            |
+| **Webhook not working**        | Verify `WEBHOOK_URL` and firewall settings        |
+| **Container won't start**      | Check logs: `docker-compose logs` or in Portainer |
 
-### Database Connection Failed
+### Health Checks
 
-1. Check if the database container is healthy:
+Both containers include health checks:
+- **PostgreSQL**: Uses `pg_isready` command
+- **n8n**: Checks port 5678 availability
+
+Monitor these in Portainer's container view or via:
+```bash
+docker-compose ps
+```
+
+### Log Monitoring
+
+**Docker Compose**:
+```bash
+docker-compose logs -f          # All services
+docker-compose logs -f n8n      # n8n only
+docker-compose logs -f db       # Database only
+```
+
+**Portainer**: Use the built-in log viewer in the container details.
+
+## 🔄 Updates
+
+### Updating n8n
+
+1. **Backup your data** first
+2. **Pull new image**:
    ```bash
-   docker-compose ps
+   docker-compose pull
+   docker-compose up -d
    ```
-2. Verify passwords match in both services
-3. Check database logs:
-   ```bash
-   docker-compose logs db
-   ```
+3. **In Portainer**: Redeploy the stack
 
-### Cannot Access Web UI
+### Updating PostgreSQL
 
-1. Verify the container is running:
-   ```bash
-   docker ps | grep n8n
-   ```
-2. Check firewall rules for port 5678
-3. Verify your domain/DNS configuration
+⚠️ **Major version updates require special care** - backup database first!
 
-### Webhook Issues
+## 📦 What's Included
 
-Ensure your `WEBHOOK_URL` is publicly accessible and matches your reverse proxy configuration.
+- **docker-compose.yml**: Main orchestration file
+- **env.example**: Environment variables template  
+- **README.md**: This comprehensive guide
+- **.gitignore**: Protects sensitive files
 
-## 📚 Additional Resources
+## 🤝 Portainer Benefits
 
-- [n8n Documentation](https://docs.n8n.io/)
-- [n8n Community Forum](https://community.n8n.io/)
-- [Docker Documentation](https://docs.docker.com/)
-- [Synology Docker Guide](https://kb.synology.com/en-us/DSM/help/Docker/docker_desc)
+- **Secure variable storage**: Environment variables encrypted
+- **Easy updates**: Redeploy stacks without file editing
+- **Visual monitoring**: Container health, logs, and metrics
+- **User-friendly**: No command line required
+- **Multi-environment**: Reuse configurations across environments
 
-## 📝 License
+## 📞 Support
 
-This configuration is provided as-is. Please refer to n8n's license for the application itself.
+For issues specific to this setup, check the troubleshooting section above. For n8n-specific questions, refer to the [official n8n documentation](https://docs.n8n.io/).
 
-## 🤝 Contributing
+## 📄 License
 
-Feel free to submit issues and enhancement requests!
-
----
-
-**⚠️ Important**: Remember to never commit sensitive information like passwords or encryption keys to version control. 
+This configuration is provided as-is for educational and production use. 
