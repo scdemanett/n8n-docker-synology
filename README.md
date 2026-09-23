@@ -77,6 +77,8 @@ A Docker Compose setup for running n8n with PostgreSQL on Synology NAS, optimize
    - Add environment variables (see section below)
    - Click **Deploy the stack**
 
+> **Note:** Change variables on the **stack** (Stacks → your stack → Editor → Environment variables → Update the stack), not on the container. Container-level edits are overwritten on the next stack redeploy.
+
 ## 🔧 Environment Variables
 
 All configuration is done via environment variables. See `env.example` for a complete template.
@@ -99,6 +101,7 @@ All configuration is done via environment variables. See `env.example` for a com
 | `N8N_PROTOCOL`      | `https`               | Protocol (http/https)               |
 | `N8N_PORT`          | `5678`                | External port                       |
 | `N8N_SECURE_COOKIE` | `true`                | Secure cookies (set false for HTTP) |
+| `N8N_PROXY_HOPS`    | `0`                   | Set `1` behind a reverse proxy      |
 | `TIMEZONE`          | `America/New_York`    | System timezone                     |
 | `DATA_PATH`         | `/volume1/docker/n8n` | Data storage path                   |
 
@@ -117,6 +120,7 @@ In Portainer's Stack interface, add these in the "Environment variables" section
 | `N8N_PROTOCOL`       | `https`                            | Or `http` for testing          |
 | `N8N_PORT`           | `5678`                             | External port                  |
 | `N8N_SECURE_COOKIE`  | `true`                             | Set `false` if not using HTTPS |
+| `N8N_PROXY_HOPS`     | `1`                                | `1` behind a reverse proxy     |
 | `TIMEZONE`           | `America/New_York`                 | Your timezone                  |
 | `DATA_PATH`          | `/volume1/docker/n8n`              | Synology path                  |
 
@@ -188,6 +192,38 @@ In Portainer's Stack interface, add these in the "Environment variables" section
 - **Regular backups** of `/volume1/docker/n8n/` directory
 - **Keep containers updated** regularly
 
+## 🏠 LAN-Only (HTTP, No Domain)
+
+The simplest setup if n8n never needs to be reached from the internet. No certificates, no reverse proxy, no port forwarding.
+
+1. Stack variables (replace `192.168.1.10` with your NAS's LAN IP):
+
+   | Name                | Value                       |
+   |---------------------|-----------------------------|
+   | `N8N_HOST`          | `192.168.1.10`              |
+   | `N8N_PROTOCOL`      | `http`                      |
+   | `WEBHOOK_URL`       | `http://192.168.1.10:5678/` |
+   | `N8N_SECURE_COOKIE` | `false`                     |
+   | `N8N_PROXY_HOPS`    | `0`                         |
+
+2. Redeploy the stack and browse to `http://192.168.1.10:5678`.
+3. Make sure your router has **no port forward** to port 5678. Traffic is unencrypted, so keep it on your LAN.
+
+Limitations: external services (GitHub, Stripe, etc.) cannot reach your webhooks, and use an `http://` URL — not `https://` — or the browser will fail with `ERR_SSL_PROTOCOL_ERROR`.
+
+## 🔐 HTTPS via Synology Reverse Proxy
+
+n8n itself only serves plain HTTP on port 5678. For HTTPS, let DSM terminate TLS:
+
+1. **Control Panel → Login Portal → Advanced → Reverse Proxy → Create**
+   - Source: `HTTPS`, hostname `n8n.example.com`, port `443`
+   - Destination: `HTTP`, `localhost`, port `5678`
+   - **Custom Header → Create → WebSocket** (required by the n8n editor)
+2. **Control Panel → Security → Certificate → Settings**: assign a certificate covering the hostname (e.g. a `*.example.com` wildcard) to the new reverse proxy entry.
+3. Point DNS for the hostname at the NAS (a local DNS record on your router is enough for LAN-only access).
+   - If port 443 is forwarded to the NAS for other services, anyone can still reach n8n by sending its hostname. Keep it LAN-only with **Reverse Proxy → Access Control Profile**: allow your LAN subnet (e.g. `192.168.1.0/24`), deny all, and attach the profile to the n8n entry.
+4. Stack variables: `N8N_HOST=n8n.example.com`, `N8N_PROTOCOL=https`, `WEBHOOK_URL=https://n8n.example.com/`, `N8N_SECURE_COOKIE=true`, `N8N_PROXY_HOPS=1`.
+
 ## 🚨 Troubleshooting
 
 ### Common Issues
@@ -196,6 +232,7 @@ In Portainer's Stack interface, add these in the "Environment variables" section
 |--------------------------------|---------------------------------------------------|
 | **Database connection failed** | Ensure `POSTGRES_PASSWORD` matches in all places  |
 | **Cookie/session errors**      | Set `N8N_SECURE_COOKIE=false` if not using HTTPS  |
+| **`ERR_SSL_PROTOCOL_ERROR`**   | n8n only speaks HTTP; `N8N_PROTOCOL=https` does not enable TLS. Use a reverse proxy (see above) or `http://` |
 | **Permission denied**          | Check directory permissions and ownership         |
 | **Port already in use**        | Change `N8N_PORT` to an available port            |
 | **Webhook not working**        | Verify `WEBHOOK_URL` and firewall settings        |
